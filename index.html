@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title>Disturbance of the Eider Population due to human acitivity </title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/multi-style-layer.js"></script>
+        <script src="js/leaflet-svg-shape-markers.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="data/BordersofSouthwestFinland_1.js"></script>
+        <script src="data/Netfishingareas_3.js"></script>
+        <script src="data/Fykenetsites_5.js"></script>
+        <script src="data/Commercialports_7.js"></script>
+        <script src="data/Oilspills19982023_9.js"></script>
+        <script src="data/Waterways_11.js"></script>
+        <script src="data/Stateownedroadsandferryroutes_13.js"></script>
+        <script src="data/Eiderobservations_15.js"></script>
+        <script>
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:5
+        })
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // add class to format popup if it contains media
+		function addClassToPopupIfMedia(content, popup) {
+			var tempDiv = document.createElement('div');
+			tempDiv.innerHTML = content;
+			if (tempDiv.querySelector('td img')) {
+				popup._contentNode.classList.add('media');
+					// Delay to force the redraw
+					setTimeout(function() {
+						popup.update();
+					}, 10);
+			} else {
+				popup._contentNode.classList.remove('media');
+			}
+		}
+        var title = new L.Control({'position':'topright'});
+        title.onAdd = function (map) {
+            this._div = L.DomUtil.create('div', 'info');
+            this.update();
+            return this._div;
+        };
+        title.update = function () {
+            this._div.innerHTML = '<h2>Disturbance of the Eider Population due to human acitivity </h2>';
+        };
+        title.addTo(map);
+        var abstract = new L.Control({'position':'bottomleft'});
+        abstract.onAdd = function (map) {
+            this._div = L.DomUtil.create('div',
+            'leaflet-control abstract');
+            this._div.id = 'abstract'
+                this._div.setAttribute("onmouseenter", "abstract.show()");
+                this._div.setAttribute("onmouseleave", "abstract.hide()");
+                this.hide();
+                return this._div;
+            };
+            abstract.hide = function () {
+                this._div.classList.remove("abstractUncollapsed");
+                this._div.classList.add("abstract");
+                this._div.innerHTML = 'i'
+            }
+            abstract.show = function () {
+                this._div.classList.remove("abstract");
+                this._div.classList.add("abstractUncollapsed");
+                this._div.innerHTML = 'This webmap project visualizes the spatial distribution of human disturbance hotspots affecting the common eider (Somateria Mollissima) in the Finnish Archipelago Sea.  This webmap investigates multiple spatial datasets, providing a heatmap visualisation of the threats to species\' habitat.<br /><br />The analysis utilizes data on common eider observations, fishing activities (fyke net sites, fishing net areas), harbors, detected oil spills, and waterways. We have created a threat index ranging from minimal (1) to extreme (5) impact. The resulting heatmap highlights disturbance hotspots. <br /><br />Key functionalisties inclue interactive visualization of eider observations, proximity analysis to threats and and integrated heat map of all disturbance factors.';
+        };
+        abstract.addTo(map);
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+            if (bounds_group.getLayers().length) {
+                map.fitBounds(bounds_group.getBounds());
+            }
+        }
+        map.createPane('pane_GoogleMaps_0');
+        map.getPane('pane_GoogleMaps_0').style.zIndex = 400;
+        var layer_GoogleMaps_0 = L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+            pane: 'pane_GoogleMaps_0',
+            opacity: 1.0,
+            attribution: '',
+            minZoom: 5,
+            maxZoom: 28,
+            minNativeZoom: 0,
+            maxNativeZoom: 19
+        });
+        layer_GoogleMaps_0;
+        map.addLayer(layer_GoogleMaps_0);
+        function pop_BordersofSouthwestFinland_1(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['id'] !== null ? autolinker.link(feature.properties['id'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_BordersofSouthwestFinland_1_0() {
+            return {
+                pane: 'pane_BordersofSouthwestFinland_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(152,125,183,0.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_BordersofSouthwestFinland_1');
+        map.getPane('pane_BordersofSouthwestFinland_1').style.zIndex = 401;
+        map.getPane('pane_BordersofSouthwestFinland_1').style['mix-blend-mode'] = 'normal';
+        var layer_BordersofSouthwestFinland_1 = new L.geoJson(json_BordersofSouthwestFinland_1, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_BordersofSouthwestFinland_1',
+            layerName: 'layer_BordersofSouthwestFinland_1',
+            pane: 'pane_BordersofSouthwestFinland_1',
+            onEachFeature: pop_BordersofSouthwestFinland_1,
+            style: style_BordersofSouthwestFinland_1_0,
+        });
+        bounds_group.addLayer(layer_BordersofSouthwestFinland_1);
+        map.addLayer(layer_BordersofSouthwestFinland_1);
+        map.createPane('pane_AreaofNetfishingdisturbance_2');
+        map.getPane('pane_AreaofNetfishingdisturbance_2').style.zIndex = 402;
+        var img_AreaofNetfishingdisturbance_2 = 'data/AreaofNetfishingdisturbance_2.png';
+        var img_bounds_AreaofNetfishingdisturbance_2 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_AreaofNetfishingdisturbance_2 = new L.imageOverlay(img_AreaofNetfishingdisturbance_2,
+                                              img_bounds_AreaofNetfishingdisturbance_2,
+                                              {pane: 'pane_AreaofNetfishingdisturbance_2'});
+        bounds_group.addLayer(layer_AreaofNetfishingdisturbance_2);
+        map.addLayer(layer_AreaofNetfishingdisturbance_2);
+        function pop_Netfishingareas_3(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Netfishingareas_3_0() {
+            return {
+                pane: 'pane_Netfishingareas_3',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(203,15,255,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Netfishingareas_3');
+        map.getPane('pane_Netfishingareas_3').style.zIndex = 403;
+        map.getPane('pane_Netfishingareas_3').style['mix-blend-mode'] = 'normal';
+        var layer_Netfishingareas_3 = new L.geoJson(json_Netfishingareas_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Netfishingareas_3',
+            layerName: 'layer_Netfishingareas_3',
+            pane: 'pane_Netfishingareas_3',
+            onEachFeature: pop_Netfishingareas_3,
+            style: style_Netfishingareas_3_0,
+        });
+        bounds_group.addLayer(layer_Netfishingareas_3);
+        map.addLayer(layer_Netfishingareas_3);
+        map.createPane('pane_AreaofFykenetdisturbance_4');
+        map.getPane('pane_AreaofFykenetdisturbance_4').style.zIndex = 404;
+        var img_AreaofFykenetdisturbance_4 = 'data/AreaofFykenetdisturbance_4.png';
+        var img_bounds_AreaofFykenetdisturbance_4 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_AreaofFykenetdisturbance_4 = new L.imageOverlay(img_AreaofFykenetdisturbance_4,
+                                              img_bounds_AreaofFykenetdisturbance_4,
+                                              {pane: 'pane_AreaofFykenetdisturbance_4'});
+        bounds_group.addLayer(layer_AreaofFykenetdisturbance_4);
+        map.addLayer(layer_AreaofFykenetdisturbance_4);
+        function pop_Fykenetsites_5(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Pyydysid'] !== null ? autolinker.link(feature.properties['Pyydysid'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Lähde'] !== null ? autolinker.link(feature.properties['Lähde'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Fykenetsites_5_0() {
+            return {
+                pane: 'pane_Fykenetsites_5',
+                radius: 2.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(146,49,168,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Fykenetsites_5');
+        map.getPane('pane_Fykenetsites_5').style.zIndex = 405;
+        map.getPane('pane_Fykenetsites_5').style['mix-blend-mode'] = 'normal';
+        var layer_Fykenetsites_5 = new L.geoJson(json_Fykenetsites_5, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Fykenetsites_5',
+            layerName: 'layer_Fykenetsites_5',
+            pane: 'pane_Fykenetsites_5',
+            onEachFeature: pop_Fykenetsites_5,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Fykenetsites_5_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Fykenetsites_5);
+        map.addLayer(layer_Fykenetsites_5);
+        map.createPane('pane_Disturbanceduetoharbours_6');
+        map.getPane('pane_Disturbanceduetoharbours_6').style.zIndex = 406;
+        var img_Disturbanceduetoharbours_6 = 'data/Disturbanceduetoharbours_6.png';
+        var img_bounds_Disturbanceduetoharbours_6 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_Disturbanceduetoharbours_6 = new L.imageOverlay(img_Disturbanceduetoharbours_6,
+                                              img_bounds_Disturbanceduetoharbours_6,
+                                              {pane: 'pane_Disturbanceduetoharbours_6'});
+        bounds_group.addLayer(layer_Disturbanceduetoharbours_6);
+        map.addLayer(layer_Disturbanceduetoharbours_6);
+        function pop_Commercialports_7(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['port'] !== null ? autolinker.link(feature.properties['port'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Country'] !== null ? autolinker.link(feature.properties['Country'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['LOCodes'] !== null ? autolinker.link(feature.properties['LOCodes'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Links'] !== null ? autolinker.link(feature.properties['Links'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Commercialports_7_0() {
+            return {
+                pane: 'pane_Commercialports_7',
+                shape: 'diamond',
+                radius: 6.0,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(180,18,13,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_Commercialports_7');
+        map.getPane('pane_Commercialports_7').style.zIndex = 407;
+        map.getPane('pane_Commercialports_7').style['mix-blend-mode'] = 'normal';
+        var layer_Commercialports_7 = new L.geoJson(json_Commercialports_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Commercialports_7',
+            layerName: 'layer_Commercialports_7',
+            pane: 'pane_Commercialports_7',
+            onEachFeature: pop_Commercialports_7,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.shapeMarker(latlng, style_Commercialports_7_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Commercialports_7);
+        map.addLayer(layer_Commercialports_7);
+        map.createPane('pane_Disturbanceduetooilspills_8');
+        map.getPane('pane_Disturbanceduetooilspills_8').style.zIndex = 408;
+        var img_Disturbanceduetooilspills_8 = 'data/Disturbanceduetooilspills_8.png';
+        var img_bounds_Disturbanceduetooilspills_8 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_Disturbanceduetooilspills_8 = new L.imageOverlay(img_Disturbanceduetooilspills_8,
+                                              img_bounds_Disturbanceduetooilspills_8,
+                                              {pane: 'pane_Disturbanceduetooilspills_8'});
+        bounds_group.addLayer(layer_Disturbanceduetooilspills_8);
+        map.addLayer(layer_Disturbanceduetooilspills_8);
+        function pop_Oilspills19982023_9(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['HELCOM_ID'] !== null ? autolinker.link(feature.properties['HELCOM_ID'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Country'] !== null ? autolinker.link(feature.properties['Country'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Year'] !== null ? autolinker.link(feature.properties['Year'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Spill_ID'] !== null ? autolinker.link(feature.properties['Spill_ID'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['FlightType'] !== null ? autolinker.link(feature.properties['FlightType'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Wind_speed'] !== null ? autolinker.link(feature.properties['Wind_speed'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Wind_direc'] !== null ? autolinker.link(feature.properties['Wind_direc'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Latitude'] !== null ? autolinker.link(feature.properties['Latitude'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Longitude'] !== null ? autolinker.link(feature.properties['Longitude'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Length__km'] !== null ? autolinker.link(feature.properties['Length__km'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Width__km_'] !== null ? autolinker.link(feature.properties['Width__km_'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Area__km2_'] !== null ? autolinker.link(feature.properties['Area__km2_'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Spill_cat'] !== null ? autolinker.link(feature.properties['Spill_cat'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['EstimVol_m'] !== null ? autolinker.link(feature.properties['EstimVol_m'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Vol_Catego'] !== null ? autolinker.link(feature.properties['Vol_Catego'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Type_Subst'] !== null ? autolinker.link(feature.properties['Type_Subst'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Polluter'] !== null ? autolinker.link(feature.properties['Polluter'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Remarks'] !== null ? autolinker.link(feature.properties['Remarks'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Date'] !== null ? autolinker.link(feature.properties['Date'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['Time_UTC'] !== null ? autolinker.link(feature.properties['Time_UTC'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Oilspills19982023_9_0(feature) {
+            switch(String(feature.properties['Vol_Catego'])) {
+                case '0.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(250,250,250,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '1.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(207,207,207,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '2.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(138,138,139,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '3.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(76,76,76,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '4.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 6.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(0,0,0,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        function style_Oilspills19982023_9_1(feature) {
+            switch(String(feature.properties['Vol_Catego'])) {
+                case '0.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(250,250,250,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '1.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(207,207,207,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '2.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(138,138,139,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '3.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(76,76,76,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '4.0':
+                    return {
+                pane: 'pane_Oilspills19982023_9',
+                radius: 1.4,
+                opacity: 1,
+                color: 'rgba(0,0,0,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 2.0,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(0,0,0,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Oilspills19982023_9');
+        map.getPane('pane_Oilspills19982023_9').style.zIndex = 409;
+        map.getPane('pane_Oilspills19982023_9').style['mix-blend-mode'] = 'normal';
+        var layer_Oilspills19982023_9 = new L.geoJson.multiStyle(json_Oilspills19982023_9, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Oilspills19982023_9',
+            layerName: 'layer_Oilspills19982023_9',
+            pane: 'pane_Oilspills19982023_9',
+            onEachFeature: pop_Oilspills19982023_9,
+            pointToLayers: [function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Oilspills19982023_9_0(feature));
+            },function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Oilspills19982023_9_1(feature));
+            },
+        ]});
+        bounds_group.addLayer(layer_Oilspills19982023_9);
+        map.addLayer(layer_Oilspills19982023_9);
+        map.createPane('pane_Disturbanceduetowaterways_10');
+        map.getPane('pane_Disturbanceduetowaterways_10').style.zIndex = 410;
+        var img_Disturbanceduetowaterways_10 = 'data/Disturbanceduetowaterways_10.png';
+        var img_bounds_Disturbanceduetowaterways_10 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_Disturbanceduetowaterways_10 = new L.imageOverlay(img_Disturbanceduetowaterways_10,
+                                              img_bounds_Disturbanceduetowaterways_10,
+                                              {pane: 'pane_Disturbanceduetowaterways_10'});
+        bounds_group.addLayer(layer_Disturbanceduetowaterways_10);
+        map.addLayer(layer_Disturbanceduetowaterways_10);
+        function pop_Waterways_11(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['fid'] !== null ? autolinker.link(feature.properties['fid'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['jnro'] !== null ? autolinker.link(feature.properties['jnro'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['nimifi'] !== null ? autolinker.link(feature.properties['nimifi'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['nimisv'] !== null ? autolinker.link(feature.properties['nimisv'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['luokitusty'] !== null ? autolinker.link(feature.properties['luokitusty'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylaluokk'] !== null ? autolinker.link(feature.properties['vaylaluokk'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylaluo_1'] !== null ? autolinker.link(feature.properties['vaylaluo_1'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylaluo_2'] !== null ? autolinker.link(feature.properties['vaylaluo_2'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['omistaja'] !== null ? autolinker.link(feature.properties['omistaja'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylalajik'] !== null ? autolinker.link(feature.properties['vaylalajik'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylalajif'] !== null ? autolinker.link(feature.properties['vaylalajif'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['vaylalajis'] !== null ? autolinker.link(feature.properties['vaylalajis'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['valaistusk'] !== null ? autolinker.link(feature.properties['valaistusk'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['mitoitussy'] !== null ? autolinker.link(feature.properties['mitoitussy'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['valaistusf'] !== null ? autolinker.link(feature.properties['valaistusf'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['valaistuss'] !== null ? autolinker.link(feature.properties['valaistuss'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['merialuefi'] !== null ? autolinker.link(feature.properties['merialuefi'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['merialuesv'] !== null ? autolinker.link(feature.properties['merialuesv'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['alunselost'] !== null ? autolinker.link(feature.properties['alunselost'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['paatepiste'] !== null ? autolinker.link(feature.properties['paatepiste'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['irrotus_pv'] !== null ? autolinker.link(feature.properties['irrotus_pv'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Waterways_11_0(feature) {
+            switch(String(feature.properties['vaylaluo_1'])) {
+                case 'VL1: Kauppamerenkulun pääväylä':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(68,1,84,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'VL2: Kauppamerenkulun 2-lk väylä':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(82,87,172,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'VL3: Hyötyliikenteen matalaväylä':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(31,120,180,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'VL4: Veneilyn runkoväylä':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(1,208,255,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'VL5: Paikallisveneväylä':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(33,243,226,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'VL6: Venereitti':
+                    return {
+                pane: 'pane_Waterways_11',
+                opacity: 1,
+                color: 'rgba(161,250,241,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Waterways_11');
+        map.getPane('pane_Waterways_11').style.zIndex = 411;
+        map.getPane('pane_Waterways_11').style['mix-blend-mode'] = 'normal';
+        var layer_Waterways_11 = new L.geoJson(json_Waterways_11, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Waterways_11',
+            layerName: 'layer_Waterways_11',
+            pane: 'pane_Waterways_11',
+            onEachFeature: pop_Waterways_11,
+            style: style_Waterways_11_0,
+        });
+        bounds_group.addLayer(layer_Waterways_11);
+        map.addLayer(layer_Waterways_11);
+        map.createPane('pane_Disturbancebyroadsandferries_12');
+        map.getPane('pane_Disturbancebyroadsandferries_12').style.zIndex = 412;
+        var img_Disturbancebyroadsandferries_12 = 'data/Disturbancebyroadsandferries_12.png';
+        var img_bounds_Disturbancebyroadsandferries_12 = [[59.62097299681628,20.86430822318476],[60.985387673018174,22.88436910558934]];
+        var layer_Disturbancebyroadsandferries_12 = new L.imageOverlay(img_Disturbancebyroadsandferries_12,
+                                              img_bounds_Disturbancebyroadsandferries_12,
+                                              {pane: 'pane_Disturbancebyroadsandferries_12'});
+        bounds_group.addLayer(layer_Disturbancebyroadsandferries_12);
+        map.addLayer(layer_Disturbancebyroadsandferries_12);
+        function pop_Stateownedroadsandferryroutes_13(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['objectid'] !== null ? autolinker.link(feature.properties['objectid'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osoite3'] !== null ? autolinker.link(feature.properties['osoite3'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tie'] !== null ? autolinker.link(feature.properties['tie'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ajorata'] !== null ? autolinker.link(feature.properties['ajorata'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['osa'] !== null ? autolinker.link(feature.properties['osa'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ely'] !== null ? autolinker.link(feature.properties['ely'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['ajr_pituus'] !== null ? autolinker.link(feature.properties['ajr_pituus'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['irrotus_pv'] !== null ? autolinker.link(feature.properties['irrotus_pv'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['tietyyppi'] !== null ? autolinker.link(feature.properties['tietyyppi'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Stateownedroadsandferryroutes_13_0(feature) {
+            switch(String(feature.properties['tietyyppi'])) {
+                case 'Yhdystie':
+                    return {
+                pane: 'pane_Stateownedroadsandferryroutes_13',
+                opacity: 1,
+                color: 'rgba(250,151,210,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Seututie':
+                    return {
+                pane: 'pane_Stateownedroadsandferryroutes_13',
+                opacity: 1,
+                color: 'rgba(255,127,0,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Kantatie':
+                    return {
+                pane: 'pane_Stateownedroadsandferryroutes_13',
+                opacity: 1,
+                color: 'rgba(227,26,28,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 1.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+                case 'Valtatie':
+                    return {
+                pane: 'pane_Stateownedroadsandferryroutes_13',
+                opacity: 1,
+                color: 'rgba(180,8,36,1.0)',
+                dashArray: '',
+                lineCap: 'square',
+                lineJoin: 'bevel',
+                weight: 2.0,
+                fillOpacity: 0,
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Stateownedroadsandferryroutes_13');
+        map.getPane('pane_Stateownedroadsandferryroutes_13').style.zIndex = 413;
+        map.getPane('pane_Stateownedroadsandferryroutes_13').style['mix-blend-mode'] = 'normal';
+        var layer_Stateownedroadsandferryroutes_13 = new L.geoJson(json_Stateownedroadsandferryroutes_13, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Stateownedroadsandferryroutes_13',
+            layerName: 'layer_Stateownedroadsandferryroutes_13',
+            pane: 'pane_Stateownedroadsandferryroutes_13',
+            onEachFeature: pop_Stateownedroadsandferryroutes_13,
+            style: style_Stateownedroadsandferryroutes_13_0,
+        });
+        bounds_group.addLayer(layer_Stateownedroadsandferryroutes_13);
+        map.addLayer(layer_Stateownedroadsandferryroutes_13);
+        map.createPane('pane_DisturbanceHotSpots_14');
+        map.getPane('pane_DisturbanceHotSpots_14').style.zIndex = 414;
+        var img_DisturbanceHotSpots_14 = 'data/DisturbanceHotSpots_14.png';
+        var img_bounds_DisturbanceHotSpots_14 = [[59.43914376961249,20.344183361660857],[61.23205133622968,24.013949836283185]];
+        var layer_DisturbanceHotSpots_14 = new L.imageOverlay(img_DisturbanceHotSpots_14,
+                                              img_bounds_DisturbanceHotSpots_14,
+                                              {pane: 'pane_DisturbanceHotSpots_14'});
+        bounds_group.addLayer(layer_DisturbanceHotSpots_14);
+        map.addLayer(layer_DisturbanceHotSpots_14);
+        function pop_Eiderobservations_15(feature, layer) {
+            var popupContent = '<table>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['abundVbtm'] !== null ? autolinker.link(feature.properties['abundVbtm'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td colspan="2">' + (feature.properties['kategoria'] !== null ? autolinker.link(feature.properties['kategoria'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_Eiderobservations_15_0(feature) {
+            switch(String(feature.properties['kategoria'])) {
+                case '1':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(247,252,245,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '2':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(226,244,221,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '3':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(191,230,185,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '4':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(148,211,144,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '5':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(96,186,108,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '6':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(50,155,81,0.7)',
+                interactive: true,
+            }
+                    break;
+                case '7':
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(13,120,53,0.7)',
+                interactive: true,
+            }
+                    break;
+                default:
+                    return {
+                pane: 'pane_Eiderobservations_15',
+                radius: 4.0,
+                opacity: 1,
+                color: 'rgba(35,35,35,0.7)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1,
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(0,68,27,0.7)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_Eiderobservations_15');
+        map.getPane('pane_Eiderobservations_15').style.zIndex = 415;
+        map.getPane('pane_Eiderobservations_15').style['mix-blend-mode'] = 'normal';
+        var layer_Eiderobservations_15 = new L.geoJson(json_Eiderobservations_15, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_Eiderobservations_15',
+            layerName: 'layer_Eiderobservations_15',
+            pane: 'pane_Eiderobservations_15',
+            onEachFeature: pop_Eiderobservations_15,
+            pointToLayer: function (feature, latlng) {
+                var context = {
+                    feature: feature,
+                    variables: {}
+                };
+                return L.circleMarker(latlng, style_Eiderobservations_15_0(feature));
+            },
+        });
+        bounds_group.addLayer(layer_Eiderobservations_15);
+        map.addLayer(layer_Eiderobservations_15);
+        var baseMaps = {};
+        var overlaysTree = [
+            {label: 'Eider observations<br /><table><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_10.png" /></td><td>1</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_21.png" /></td><td>2</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_32.png" /></td><td>3</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_43.png" /></td><td>4</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_54.png" /></td><td>5</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_65.png" /></td><td>6</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_76.png" /></td><td>7</td></tr><tr><td style="text-align: center;"><img src="legend/Eiderobservations_15_7.png" /></td><td></td></tr></table>', layer: layer_Eiderobservations_15},
+            {label: "Disturbance Hot-Spots", layer: layer_DisturbanceHotSpots_14},
+        {label: '<b>Disturbance by roads and ferries</b>', selectAllCheckbox: true, children: [
+            {label: 'State-owned roads and ferry routes<br /><table><tr><td style="text-align: center;"><img src="legend/Stateownedroadsandferryroutes_13_Accessroad0.png" /></td><td>Access road</td></tr><tr><td style="text-align: center;"><img src="legend/Stateownedroadsandferryroutes_13_Localroad1.png" /></td><td>Local road</td></tr><tr><td style="text-align: center;"><img src="legend/Stateownedroadsandferryroutes_13_Regionalroad2.png" /></td><td>Regional road</td></tr><tr><td style="text-align: center;"><img src="legend/Stateownedroadsandferryroutes_13_Nationalroad3.png" /></td><td>National road</td></tr></table>', layer: layer_Stateownedroadsandferryroutes_13},
+            {label: "Disturbance by roads and ferries", layer: layer_Disturbancebyroadsandferries_12},]},
+        {label: '<b>Disturbance due to waterways</b>', selectAllCheckbox: true, children: [
+            {label: 'Waterways<br /><table><tr><td style="text-align: center;"><img src="legend/Waterways_11_Mainmerchantshippingroute0.png" /></td><td>Main merchant shipping route</td></tr><tr><td style="text-align: center;"><img src="legend/Waterways_11_Secondarymerchantshippingroute1.png" /></td><td>Secondary merchant shipping route</td></tr><tr><td style="text-align: center;"><img src="legend/Waterways_11_Shallowchannelformerchantshipping2.png" /></td><td>Shallow channel for merchant shipping</td></tr><tr><td style="text-align: center;"><img src="legend/Waterways_11_Mainboatingroute3.png" /></td><td>Main boating route</td></tr><tr><td style="text-align: center;"><img src="legend/Waterways_11_Localboatingroute4.png" /></td><td>Local boating route</td></tr><tr><td style="text-align: center;"><img src="legend/Waterways_11_Boatingroute5.png" /></td><td>Boating route</td></tr></table>', layer: layer_Waterways_11},
+            {label: "Disturbance due to waterways", layer: layer_Disturbanceduetowaterways_10},]},
+        {label: '<b>Disturbance due to oil spills</b>', selectAllCheckbox: true, children: [
+            {label: 'Oil spills 1998-2023<br /><table><tr><td style="text-align: center;"><img src="legend/Oilspills19982023_9_100litres0.png" /></td><td>< 100 litres</td></tr><tr><td style="text-align: center;"><img src="legend/Oilspills19982023_9_100999litres1.png" /></td><td>100-999 litres</td></tr><tr><td style="text-align: center;"><img src="legend/Oilspills19982023_9_10009999litres2.png" /></td><td>1000-9999 litres</td></tr><tr><td style="text-align: center;"><img src="legend/Oilspills19982023_9_1000099999litres3.png" /></td><td>10000-99999 litres</td></tr><tr><td style="text-align: center;"><img src="legend/Oilspills19982023_9_100000litres4.png" /></td><td>> 100000 litres</td></tr></table>', layer: layer_Oilspills19982023_9},
+            {label: "Disturbance due to oil spills", layer: layer_Disturbanceduetooilspills_8},]},
+        {label: '<b>Disturbance due to harbours</b>', selectAllCheckbox: true, children: [
+            {label: '<img src="legend/Commercialports_7.png" /> Commercial ports', layer: layer_Commercialports_7},
+            {label: "Disturbance due to harbours", layer: layer_Disturbanceduetoharbours_6},]},
+        {label: '<b>Fyke nets</b>', selectAllCheckbox: true, children: [
+            {label: '<img src="legend/Fykenetsites_5.png" /> Fyke net sites', layer: layer_Fykenetsites_5},
+            {label: "Area of Fyke net disturbance", layer: layer_AreaofFykenetdisturbance_4},]},
+        {label: '<b>Net-fishing</b>', selectAllCheckbox: true, children: [
+            {label: '<img src="legend/Netfishingareas_3.png" /> Net-fishing areas', layer: layer_Netfishingareas_3},
+            {label: "Area of Net-fishing disturbance ", layer: layer_AreaofNetfishingdisturbance_2},]},
+            {label: '<img src="legend/BordersofSouthwestFinland_1.png" /> Borders of Southwest Finland', layer: layer_BordersofSouthwestFinland_1},
+            {label: "Google Maps", layer: layer_GoogleMaps_0},]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: false, 
+        });
+        lay.addTo(map);
+		document.addEventListener("DOMContentLoaded", function() {
+            // set new Layers List height which considers toggle icon
+            function newLayersListHeight() {
+                var layerScrollbarElement = document.querySelector('.leaflet-control-layers-scrollbar');
+                if (layerScrollbarElement) {
+                    var layersListElement = document.querySelector('.leaflet-control-layers-list');
+                    var originalHeight = layersListElement.style.height 
+                        || window.getComputedStyle(layersListElement).height;
+                    var newHeight = parseFloat(originalHeight) - 50;
+                    layersListElement.style.height = newHeight + 'px';
+                }
+            }
+            var isLayersListExpanded = true;
+            var controlLayersElement = document.querySelector('.leaflet-control-layers');
+            var toggleLayerControl = document.querySelector('.leaflet-control-layers-toggle');
+            // toggle Collapsed/Expanded and apply new Layers List height
+            toggleLayerControl.addEventListener('click', function() {
+                if (isLayersListExpanded) {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                } else {
+                    controlLayersElement.classList.add('leaflet-control-layers-expanded');
+                }
+                isLayersListExpanded = !isLayersListExpanded;
+                newLayersListHeight()
+            });	
+			// apply new Layers List height if toggle layerstree
+			if (controlLayersElement) {
+				controlLayersElement.addEventListener('click', function(event) {
+					var toggleLayerHeaderPointer = event.target.closest('.leaflet-layerstree-header-pointer span');
+					if (toggleLayerHeaderPointer) {
+						newLayersListHeight();
+					}
+				});
+			}
+            // Collapsed/Expanded at Start to apply new height
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            setTimeout(function() {
+                toggleLayerControl.click();
+            }, 10);
+            // Collapsed touch/small screen
+            var isSmallScreen = window.innerWidth < 650;
+            if (isSmallScreen) {
+                setTimeout(function() {
+                    controlLayersElement.classList.remove('leaflet-control-layers-expanded');
+                    isLayersListExpanded = !isLayersListExpanded;
+                }, 500);
+            }  
+        });       
+        setBounds();
+        L.ImageOverlay.include({
+            getBounds: function () {
+                return this._bounds;
+            }
+        });
+        </script>
+    </body>
+</html>
